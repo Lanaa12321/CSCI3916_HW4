@@ -5,10 +5,13 @@ var Schema = mongoose.Schema;
 var MovieSchema = new Schema({
     title: {
         type: String,
-        required: true
+        required: true,
+        index: true
     },
     releaseDate: {
-        type: String,
+        type: Number,
+        min: 1900,
+        max: 2100,
         required: true
     },
     genre: {
@@ -18,6 +21,10 @@ var MovieSchema = new Schema({
     actors: {
         type: [String],
         required: true
+    },
+    imageUrl: {
+        type: String,
+        default: ''
     }
 });
 
