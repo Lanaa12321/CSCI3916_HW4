@@ -18,13 +18,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-mongoose.connect(process.env.MONGO_URI)
-    .then(function () {
-        console.log('MongoDB connected');
-    })
-    .catch(function (err) {
-        console.log('MongoDB connection error:', err.message);
-    });
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(function () {
+    console.log('MongoDB connected');
+})
+.catch(function (err) {
+    console.log('MongoDB connection error:', err.message);
+});
 
 function handleServerError(res, err) {
     return res.status(500).json({
@@ -62,10 +65,10 @@ function trackReviewEvent(movie, req) {
     SIGNUP
 */
 router.post('/signup', function (req, res) {
-    if (!req.body.username || !req.body.password) {
+    if (!req.body.name || !req.body.username || !req.body.password) {
         return res.status(400).json({
             success: false,
-            msg: 'Please include both username and password to signup.'
+            msg: 'Please include name, username, and password to signup.'
         });
     }
 
@@ -82,6 +85,7 @@ router.post('/signup', function (req, res) {
         }
 
         var newUser = new User({
+            name: req.body.name,
             username: req.body.username,
             password: req.body.password
         });
@@ -111,7 +115,7 @@ router.post('/signin', function (req, res) {
     }
 
     User.findOne({ username: req.body.username })
-        .select('username password')
+        .select('name username password')
         .exec(function (err, user) {
             if (err) {
                 return handleServerError(res, err);
@@ -138,7 +142,8 @@ router.post('/signin', function (req, res) {
 
                 var userToken = {
                     id: user._id,
-                    username: user.username
+                    username: user.username,
+                    name: user.name
                 };
 
                 var token = jwt.sign(userToken, authJwtController.secret, {
@@ -162,7 +167,8 @@ router.route('/movies')
             title: req.body.title,
             releaseDate: req.body.releaseDate,
             genre: req.body.genre,
-            actors: req.body.actors
+            actors: req.body.actors,
+            imageUrl: req.body.imageUrl
         });
 
         movie.save(function (err, savedMovie) {
@@ -173,7 +179,7 @@ router.route('/movies')
             return res.status(200).json(savedMovie);
         });
     })
-    .get(function (req, res) {
+    .get(authJwtController.isAuthenticated, function (req, res) {
         if (req.query.reviews === 'true') {
             return Movie.aggregate([
                 {
@@ -183,6 +189,14 @@ router.route('/movies')
                         foreignField: 'movieId',
                         as: 'reviews'
                     }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$reviews.rating' }
+                    }
+                },
+                {
+                    $sort: { avgRating: -1 }
                 }
             ]).exec(function (err, movies) {
                 if (err) {
@@ -202,7 +216,7 @@ router.route('/movies')
         });
     });
 
-router.get('/movies/:id', function (req, res) {
+router.get('/movies/:id', authJwtController.isAuthenticated, function (req, res) {
     if (req.query.reviews === 'true') {
         var movieId;
 
@@ -225,6 +239,11 @@ router.get('/movies/:id', function (req, res) {
                     localField: '_id',
                     foreignField: 'movieId',
                     as: 'reviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$reviews.rating' }
                 }
             }
         ]).exec(function (err, movies) {
@@ -272,6 +291,7 @@ router.put('/movies/:id', authJwtController.isAuthenticated, function (req, res)
         movie.releaseDate = req.body.releaseDate || movie.releaseDate;
         movie.genre = req.body.genre || movie.genre;
         movie.actors = req.body.actors || movie.actors;
+        movie.imageUrl = req.body.imageUrl || movie.imageUrl;
 
         movie.save(function (saveErr, updatedMovie) {
             if (saveErr) {
@@ -307,7 +327,7 @@ router.delete('/movies/:id', authJwtController.isAuthenticated, function (req, r
     REVIEWS
 */
 router.route('/reviews')
-    .get(function (req, res) {
+    .get(authJwtController.isAuthenticated, function (req, res) {
         var query = {};
 
         if (req.query.movieId) {
