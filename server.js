@@ -161,34 +161,33 @@ router.post('/signin', function (req, res) {
 /*
     MOVIES
 */
-.post(authJwtController.isAuthenticated, function (req, res) {
-    if (!req.body.title || req.body.title.trim() === "" ||
-        !req.body.releaseDate || !req.body.genre ||
-        !req.body.actors || !req.body.imageUrl) {
-        return res.status(400).json({
-            success: false,
-            message: 'Missing required movie information'
-        });
-    }
-
-    var movie = new Movie({
-        title: req.body.title,
-        releaseDate: req.body.releaseDate,
-        genre: req.body.genre,
-        actors: req.body.actors,
-        imageUrl: req.body.imageUrl
-    });
-
-    movie.save(function (err, savedMovie) {
-        if (err) {
-            return handleServerError(res, err);
+router.route('/movies')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+        if (!req.body.title || req.body.title.trim() === "" ||
+            !req.body.releaseDate || !req.body.genre ||
+            !req.body.actors || !req.body.imageUrl) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required movie information'
+            });
         }
 
-        return res.status(200).json(savedMovie);
-    });
-})
+        var movie = new Movie({
+            title: req.body.title,
+            releaseDate: req.body.releaseDate,
+            genre: req.body.genre,
+            actors: req.body.actors,
+            imageUrl: req.body.imageUrl
+        });
 
+        movie.save(function (err, savedMovie) {
+            if (err) {
+                return handleServerError(res, err);
+            }
 
+            return res.status(200).json(savedMovie);
+        });
+    })
     .get(authJwtController.isAuthenticated, function (req, res) {
         if (req.query.reviews === 'true') {
             return Movie.aggregate([
